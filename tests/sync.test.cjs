@@ -11,6 +11,8 @@ const { insertOutfit, listOutfits } = require('../src/data/outfit-repository.ts'
 const { getBinding, getSyncValue, mergeOutfit, setSyncValue } = require('../src/data/sync-repository.ts');
 const { synchronizeOnce, createSyncRunner } = require('../src/services/sync-engine.ts');
 const { createSupabaseRemote } = require('../src/services/supabase-remote.ts');
+const { deleteClothing, deleteOutfit, updateClothing, updateOutfit, listDeletions, nextUpdatedAt } = require('../src/data/wardrobe-mutations.ts');
+const { saveClothing } = require('../src/services/save-clothing.ts');
 const uid = '9f2a027b-d631-4d62-99e8-8f0940683776';
 const cid = '2e67b24c-770c-47b2-b4d8-ef5eaf56bdd4';
 const oid = 'b573e332-3b89-489c-80d9-dc057bd76f41';
@@ -50,6 +52,7 @@ async function setup(t) {
     },
     saveLinks: async (item, user) => {
       calls.push('links');
+      for (const [key, row] of cloud.links) if (row.outfit_id === item.id) cloud.links.delete(key);
       for (const [position, id] of item.clothingIds.entries()) {
         assert.ok(cloud.clothes.has(id));
         cloud.links.set(`${item.id}/${id}`, { outfit_id: item.id, clothing_item_id: id, user_id: user, position, created_at: date, updated_at: date });
@@ -58,6 +61,11 @@ async function setup(t) {
     download: async () => ({ clothes: [...cloud.clothes.values()], outfits: [...cloud.outfits.values()], links: [...cloud.links.values()] }),
     uploadPhoto: async (path, bytes) => { calls.push('photo'); cloud.photos.set(path, bytes); },
     downloadPhoto: async (path) => cloud.photos.get(path),
+    deleteRecord: async (entity, id) => {
+      (entity === 'clothing' ? cloud.clothes : cloud.outfits).delete(id);
+      for (const [key, row] of cloud.links) if (entity === 'clothing' ? row.clothing_item_id === id : row.outfit_id === id) cloud.links.delete(key);
+    },
+    deletePhoto: async (path) => { cloud.photos.delete(path); },
   };
   const deps = { runLocal: async (task) => task(db), remote, photos: {
     read: async (path) => { if (!files.has(path)) throw new Error('A foto não existe.'); return files.get(path); },
@@ -202,4 +210,87 @@ test('duas solicitações simultâneas compartilham a execução e incluem cadas
   await first;
   assert.equal(s.cloud.clothes.size, 1);
   assert.equal((await listClothing(s.db))[0].syncStatus, 'synced');
+});
+
+test('edição preserva UUID e data de criação, substitui peças do look e protege a foto antiga em uma falha', async (t) => {
+  const s = await setup(t);
+  const other = { ...clothing, id: '8a9eed3a-224e-4355-b0fb-b10bca4a9e46', name: 'Outra camisa' };
+  await insertClothing(s.db, clothing);
+  await insertClothing(s.db, other);
+  await insertOutfit(s.db, outfit);
+  await synchronizeOnce(s.deps);
+  const old = (await listClothing(s.db)).find((item) => item.id === cid);
+  const draft = { name: 'Camisa editada', category: 'tops', color: 'Preto', notes: 'Alterada' };
+  const changed = await saveClothing(draft, {
+    createId: () => assert.fail('Não deve trocar UUID sem alterar a foto.'),
+    persistPhoto: async () => assert.fail('Não deve copiar foto.'), removePhoto: async () => {},
+    insert: (item) => updateClothing(s.db, item),
+  }, old);
+  assert.equal(changed.id, cid);
+  assert.equal(changed.createdAt, clothing.createdAt);
+  assert.equal(changed.syncStatus, 'pending');
+  const previousLook = (await listOutfits(s.db))[0];
+  await updateOutfit(s.db, { ...previousLook, name: 'Look editado', clothingIds: [other.id], updatedAt: nextUpdatedAt(previousLook.updatedAt) });
+  await synchronizeOnce(s.deps);
+  assert.equal(s.cloud.clothes.size, 2);
+  assert.equal(s.cloud.clothes.get(cid).name, draft.name);
+  assert.equal(s.cloud.outfits.size, 1);
+  assert.equal(s.cloud.outfits.get(oid).name, 'Look editado');
+  assert.deepEqual([...s.cloud.links.values()].map((link) => link.clothing_item_id), [other.id]);
+  const removed = [];
+  await assert.rejects(saveClothing({ ...draft, photoUri: 'nova-foto.jpg', photoChanged: true }, {
+    createId: () => 'new-photo', persistPhoto: async (_uri, id) => `${id}.jpg`,
+    removePhoto: async (path) => { removed.push(path); }, insert: async () => { throw new Error('Falha SQLite'); },
+  }, { ...changed, localPhotoPath: 'old-photo.jpg' }), /Falha SQLite/);
+  assert.deepEqual(removed, ['new-photo.jpg']);
+});
+
+test('excluir roupa atualiza os looks, exclui os vazios e repete a exclusão online sem restaurar registros', async (t) => {
+  const s = await setup(t);
+  const other = { ...clothing, id: '75b0e9dc-35a7-474a-b013-5b2fa6fb06ca', name: 'Calça', category: 'bottoms' };
+  await insertClothing(s.db, clothing);
+  await insertClothing(s.db, other);
+  await insertOutfit(s.db, outfit);
+  const second = { ...outfit, id: 'b6950091-4c8c-46a5-87c6-0f9d94e2c23f', clothingIds: [cid, other.id] };
+  await insertOutfit(s.db, second);
+  await synchronizeOnce(s.deps);
+  await deleteClothing(s.db, cid);
+  assert.deepEqual((await listOutfits(s.db)).map((look) => look.clothingIds), [[other.id]]);
+  const remove = s.remote.deleteRecord;
+  s.remote.deleteRecord = async () => { throw new Error('Network failed'); };
+  assert.ok((await synchronizeOnce(s.deps)).issues.length);
+  assert.equal((await listClothing(s.db)).some((item) => item.id === cid), false);
+  assert.equal((await listOutfits(s.db)).some((look) => look.id === oid), false);
+  assert.equal((await listDeletions(s.db)).length, 2);
+  s.remote.deleteRecord = remove;
+  await synchronizeOnce(s.deps);
+  assert.equal(s.cloud.clothes.has(cid), false);
+  assert.equal(s.cloud.outfits.has(oid), false);
+  assert.equal((await listDeletions(s.db)).length, 0);
+  await deleteOutfit(s.db, second.id);
+  await synchronizeOnce(s.deps);
+  assert.equal(s.cloud.outfits.size, 0);
+  assert.equal(s.cloud.clothes.has(other.id), true);
+});
+
+test('exclusão durante upload não ressuscita peça; limpeza da foto pode ser retomada após falha', async (t) => {
+  const s = await setup(t);
+  await insertClothing(s.db, clothing);
+  const save = s.remote.saveClothing;
+  s.remote.saveClothing = async (...args) => {
+    const row = await save(...args);
+    await deleteClothing(s.db, cid);
+    return row;
+  };
+  s.cloud.photos.set(`${uid}/${cid}.jpg`, new Uint8Array([1]).buffer);
+  const remove = s.remote.deletePhoto;
+  s.remote.deletePhoto = async () => { throw new Error('Network failed'); };
+  await synchronizeOnce(s.deps);
+  assert.deepEqual(await listClothing(s.db), []);
+  assert.equal(s.cloud.clothes.has(cid), false);
+  assert.equal((await listDeletions(s.db)).length, 1);
+  s.remote.deletePhoto = remove;
+  await synchronizeOnce(s.deps);
+  assert.equal(s.cloud.photos.size, 0);
+  assert.equal((await listDeletions(s.db)).length, 0);
 });

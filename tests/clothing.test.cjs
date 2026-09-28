@@ -127,8 +127,8 @@ test('banco também rejeita categorias inválidas e versões futuras não são r
     await assert.rejects(insertClothing(db, {
       id, name: 'Peça', category: 'invalid', color: 'Preto', createdAt: '', updatedAt: '', syncStatus: 'pending',
     }), /CHECK/);
-    await db.execAsync('PRAGMA user_version = 4');
+    await db.execAsync('PRAGMA user_version = 5');
     await assert.rejects(migrateDatabase(db), /mais recente/);
-    assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 4);
+    assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 5);
   } finally { raw.close(); }
 });
