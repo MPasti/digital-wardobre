@@ -1,12 +1,15 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { WardrobeProvider } from '../context/wardrobe';
+import { observeSupabaseAppState } from '../lib/supabase';
 import { theme } from '../theme';
 
 export const unstable_settings = { initialRouteName: '(tabs)' };
 
 export default function RootLayout() {
+  useEffect(() => observeSupabaseAppState(), []);
   return <SafeAreaProvider>
     <StatusBar style="dark" />
     <WardrobeProvider>

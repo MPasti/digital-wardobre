@@ -33,3 +33,28 @@ export async function resolvePhoto(path: string) {
   const file = photoFile(path);
   return file.exists ? file.uri : undefined;
 }
+
+export async function hasPhoto(path: string) {
+  const file = photoFile(path);
+  return file.exists && file.size > 0;
+}
+
+export async function readPhotoBytes(path: string): Promise<ArrayBuffer> {
+  const file = photoFile(path);
+  if (!file.exists || !file.size) throw new Error('A foto local não foi encontrada. Os dados da peça foram preservados.');
+  return file.arrayBuffer();
+}
+
+export async function savePhotoBytes(bytes: ArrayBuffer, id: string) {
+  const path = `${id}.jpg`;
+  const file = photoFile(path);
+  new Directory(Paths.document, 'clothing-photos').create({ idempotent: true, intermediates: true });
+  try {
+    file.write(new Uint8Array(bytes));
+    if (!file.exists || file.size !== bytes.byteLength) throw new Error('A foto não foi salva por completo.');
+    return path;
+  } catch (error) {
+    try { if (file.exists) file.delete(); } catch {}
+    throw error;
+  }
+}

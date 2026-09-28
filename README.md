@@ -2,12 +2,12 @@
 
 Aplicativo para trabalho de mobile 2 em React Native + Expo para organizar roupas.
 
-## Etapa atual: roupas, looks e armazenamento local
+## Etapa atual: roupas, looks e sincronização com Supabase
 
 Implementado:
 
 - Expo SDK 57, React Native e TypeScript.
-- Navegação por abas com Expo Router: Guarda roupa e Looks.
+- Navegação por abas com Expo Router: Guarda roupa, Looks e Nuvem.
 - Tela de dicas, retorno e tratamento de rota inexistente.
 - Interface em português, categorias selecionáveis e estados vazios.
 - Tema compartilhado e componentes reutilizáveis.
@@ -18,7 +18,15 @@ Implementado:
 - Seleção por categoria, opção de peça única, lista e detalhes dos looks.
 - Looks e suas peças salvos juntos no SQLite, sem duplicar as fotos.
 
-Ainda não implementado: edição/exclusão, autenticação e sincronização. **Não há conexão com o Supabase nesta etapa.**
+- Identificação automática por Supabase Auth anônimo, com sessão persistente.
+- Sincronização de roupas, looks e fotos com UUIDs preservados e retentativa sem duplicar.
+- Envio das pendências locais e recebimento dos registros da nuvem no SQLite.
+- Fotos em bucket privado, com cópia local para uso sem internet.
+- Aba Nuvem com contagens pendentes, última sincronização e botão para tentar novamente.
+
+Consulte [Configurar o Supabase](docs/CONFIGURAR-SUPABASE.md): além do `.env`, habilite o acesso anônimo e execute `supabase/02_storage_fotos.sql` no painel. As três tabelas com RLS devem existir conforme o SQL anterior. Com configuração incompleta, o cadastro local continua disponível e a aba Nuvem explica a pendência.
+
+O `id` gerado por `expo-crypto` é o UUID compartilhado entre SQLite e PostgreSQL, cumprindo o papel de `sync_id` da aula. O SDK 57 foi mantido com autorização do usuário. Sem conta vinculada, a identidade anônima depende da sessão deste aparelho; não é recuperável em outro celular. Não há edição/exclusão, conta por e-mail nem visão computacional nesta etapa.
 
 ## Abrir no iPhone com Expo Go
 
@@ -51,4 +59,5 @@ pnpm web           # Prévia visual no navegador
 pnpm typecheck     # Verificação TypeScript
 pnpm lint          # Verificação de código
 pnpm doctor        # Diagnóstico do Expo
+pnpm test          # Testes de persistência e sincronização
 ```

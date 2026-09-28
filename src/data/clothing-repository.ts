@@ -12,10 +12,10 @@ export async function migrateDatabase(db: LocalDatabase) {
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   const version = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const currentVersion = version?.user_version ?? 0;
-  if (currentVersion > 2) {
+  if (currentVersion > 3) {
     throw new Error('O banco foi criado por uma versão mais recente do aplicativo.');
   }
-  if (currentVersion === 2) return;
+  if (currentVersion === 3) return;
   await db.withTransactionAsync(async () => {
     if (currentVersion === 0) {
     await db.execAsync(`
@@ -34,7 +34,7 @@ export async function migrateDatabase(db: LocalDatabase) {
       CREATE INDEX clothing_items_category_idx ON clothing_items(category);
     `);
     }
-    await db.execAsync(`
+    if (currentVersion < 2) await db.execAsync(`
       CREATE TABLE outfits (
         id TEXT PRIMARY KEY NOT NULL,
         name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 100),
@@ -53,7 +53,10 @@ export async function migrateDatabase(db: LocalDatabase) {
         UNIQUE (outfit_id, position)
       );
       CREATE INDEX outfit_items_clothing_idx ON outfit_items(clothing_item_id);
-      PRAGMA user_version = 2;
+    `);
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+      PRAGMA user_version = 3;
     `);
   });
 }

@@ -49,3 +49,20 @@ export async function resolvePhoto(path: string): Promise<string | undefined> {
     reader.readAsDataURL(blob);
   });
 }
+
+export async function hasPhoto(path: string) {
+  const blob = await photoTransaction<Blob | undefined>('readonly', (store) => store.get(path));
+  return !!blob?.size;
+}
+
+export async function readPhotoBytes(path: string): Promise<ArrayBuffer> {
+  const blob = await photoTransaction<Blob | undefined>('readonly', (store) => store.get(path));
+  if (!blob?.size) throw new Error('A foto local não foi encontrada. Os dados da peça foram preservados.');
+  return blob.arrayBuffer();
+}
+
+export async function savePhotoBytes(bytes: ArrayBuffer, id: string) {
+  const path = `${id}.jpg`;
+  await photoTransaction('readwrite', (store) => store.put(new Blob([bytes], { type: 'image/jpeg' }), path));
+  return path;
+}

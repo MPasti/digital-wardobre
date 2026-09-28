@@ -21,6 +21,10 @@ export default function TabsLayout() {
         title: 'Looks',
         tabBarIcon: ({ color, size, focused }) => <MaterialCommunityIcons name={focused ? 'view-grid' : 'view-grid-outline'} color={color} size={size} />,
       }} />
+      <Tabs.Screen name="sincronizar" options={{
+        title: 'Nuvem',
+        tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="cloud-sync-outline" color={color} size={size} />,
+      }} />
     </Tabs>
   );
 }

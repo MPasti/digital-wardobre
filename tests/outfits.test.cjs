@@ -74,7 +74,7 @@ test('migração da versão 1 mantém roupas e caminhos de fotos existentes', as
     const [saved] = await listClothing(db);
     assert.equal(saved.id, 'camisa');
     assert.equal(saved.localPhotoPath, 'camisa.jpg');
-    assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 2);
+    assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 3);
     assert.deepEqual(await listOutfits(db), []);
   } finally { raw.close(); }
 });
