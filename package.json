@@ -1,22 +1,49 @@
 {
   "name": "digital-wardobre",
-  "version": "1.0.0",
-  "main": "index.ts",
+  "version": "0.1.0",
+  "main": "expo-router/entry",
   "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
     "expo": "~57.0.25",
+    "expo-constants": "~57.0.19",
+    "expo-crypto": "~57.0.3",
+    "expo-file-system": "~57.0.7",
+    "expo-font": "~57.0.4",
+    "expo-image-manipulator": "~57.0.20",
+    "expo-image-picker": "~57.0.20",
+    "expo-linking": "~57.0.11",
+    "expo-router": "~57.0.23",
+    "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.2",
+    "react-native-web": "^0.21.3",
+    "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
+    "@react-native/metro-config": "0.86.3",
     "@types/react": "~19.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~57.0.2",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "lint": "expo lint",
+    "doctor": "pnpm dlx expo-doctor",
+    "test": "node --test tests/*.test.cjs"
   },
-  "private": true
+  "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "packageManager": "pnpm@11.19.0"
 }
