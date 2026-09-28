@@ -6,19 +6,17 @@ import { useWardrobe } from '../../context/wardrobe';
 import { theme } from '../../theme';
 
 export default function SyncScreen() {
-  const { items, outfits, sync, syncNow } = useWardrobe();
+  const { items, outfits, sync, syncNow, account } = useWardrobe();
   const pendingClothes = items.filter((item) => item.syncStatus === 'pending').length;
   const pendingOutfits = outfits.filter((item) => item.syncStatus === 'pending').length;
   const missingPhotos = items.filter((item) => item.remotePhotoPath && !item.localPhotoUri).length;
-  const complete = !sync.issues.length && !pendingClothes && !pendingOutfits && !missingPhotos && !!sync.lastSuccess;
+  const complete = !sync.issues.length && !pendingClothes && !pendingOutfits && !missingPhotos && !sync.deletions && !!sync.lastSuccess;
   const title = sync.running ? 'Sincronizando…' : complete ? 'Tudo em dia' : 'Seus dados estão no aparelho';
 
   return <Page>
     <AppHeader onHelp={() => router.push('/guia')} />
     <View style={styles.intro}>
-      <Text style={styles.eyebrow}>SEU GUARDA ROUPA CONECTADO</Text>
-      <Text style={styles.heading} accessibilityRole="header">Suas peças,{ '\n' }também na nuvem.</Text>
-      <Text style={styles.description}>Cadastre e monte looks mesmo sem internet. Quando a conexão voltar, enviamos o que ficou pendente.</Text>
+      <Text style={styles.heading} accessibilityRole="header">Suas peças, são{ '\n' }salvas na nuvem.</Text>
     </View>
     <View style={styles.card}>
       <View style={styles.statusRow}>
@@ -33,18 +31,19 @@ export default function SyncScreen() {
         <View style={styles.count}><Text style={styles.number}>{outfits.length}</Text><Text style={styles.small}>looks no aparelho</Text><Text style={styles.pending}>{pendingOutfits} para enviar</Text></View>
       </View>
       {missingPhotos > 0 ? <Text style={styles.small}>{missingPhotos} foto(s) aguardando download para este aparelho.</Text> : null}
+      {sync.deletions > 0 ? <Text style={styles.small}>{sync.deletions} exclusão(ões) aguardando confirmação na nuvem.</Text> : null}
       {sync.issues.length ? <View style={styles.notice} accessibilityLiveRegion="polite">{sync.issues.map((issue) => <Text key={issue} style={styles.noticeText}>{issue}</Text>)}</View> : null}
       <ActionButton label={sync.running ? 'Sincronizando…' : 'Sincronizar agora'} icon="sync" loading={sync.running} disabled={sync.running} onPress={() => { void syncNow(); }} />
     </View>
     <View style={styles.identity}>
       <MaterialCommunityIcons name="account-outline" size={26} color={theme.colors.primary} />
       <View style={styles.statusCopy}>
-        <Text style={styles.cardTitle}>Acesso anônimo</Text>
-        <Text style={styles.small}>Sem e-mail ou senha. Sua sessão é mantida neste aparelho e cada pessoa acessa somente os próprios registros.</Text>
+        <Text style={styles.cardTitle}>{account.anonymous ? 'Acesso anônimo' : 'Sua conta'}</Text>
+        <Text style={styles.small}>{account.anonymous ? 'Crie uma conta para manter o acesso às suas peças ao trocar de aparelho.' : account.email}</Text>
         {sync.userId ? <Text style={styles.identityId} selectable>Identificação: {sync.userId}</Text> : null}
       </View>
     </View>
-    <Tip text="Guarde sua sessão: sem uma conta vinculada, reinstalar o aplicativo ou apagar os dados dele pode impedir o acesso ao que foi salvo na nuvem. Cada aparelho cria uma identidade própria." />
+    <ActionButton label={account.anonymous ? 'Vincular minha conta' : 'Gerenciar minha conta'} icon="account-outline" secondary onPress={() => router.push('/conta')} />
   </Page>;
 }
 

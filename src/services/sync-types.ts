@@ -18,6 +18,8 @@ export interface RemoteWardrobe {
   download: (userId: string) => Promise<RemoteSnapshot>;
   uploadPhoto: (path: string, bytes: ArrayBuffer) => Promise<void>;
   downloadPhoto: (path: string) => Promise<ArrayBuffer>;
+  deleteRecord: (entity: 'clothing' | 'outfit', id: string, userId: string) => Promise<void>;
+  deletePhoto: (path: string) => Promise<void>;
 }
 export type SyncDependencies = {
   runLocal: <T>(task: (db: LocalDatabase) => Promise<T>) => Promise<T>;

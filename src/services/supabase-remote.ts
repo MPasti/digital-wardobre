@@ -50,7 +50,8 @@ export function createSupabaseRemote(client: SupabaseClient, project: string): R
     },
     async saveLinks(outfit, userId) {
       if (!outfit.clothingIds.length) throw new Error('Dados do look não contêm peças.');
-      // O lote inteiro é uma transação no PostgreSQL: nenhuma composição parcial.
+      const removed = await client.from('outfit_items').delete().eq('outfit_id', outfit.id).eq('user_id', userId);
+      if (removed.error) throw removed.error;
       const { data, error } = await client.from('outfit_items').upsert(outfit.clothingIds.map((id, position) => ({
         outfit_id: outfit.id, clothing_item_id: id, user_id: userId, position,
         created_at: outfit.createdAt, updated_at: outfit.updatedAt,
@@ -77,6 +78,27 @@ export function createSupabaseRemote(client: SupabaseClient, project: string): R
       const bytes = await data.arrayBuffer();
       if (!bytes.byteLength || bytes.byteLength > 5 * 1024 * 1024) throw new Error('A foto recebida está vazia ou excede 5 MB.');
       return bytes;
+    },
+    async deleteRecord(entity, id, userId) {
+      const table = entity === 'clothing' ? 'clothing_items' : 'outfits';
+      const { error } = await client.from(table).delete().eq('id', id).eq('user_id', userId);
+      if (error) throw error;
+      const remaining = await client.from(table).select('id').eq('id', id).eq('user_id', userId).maybeSingle();
+      if (remaining.error) throw remaining.error;
+      if (remaining.data) throw new Error('Dados não excluídos na nuvem. Confira a política DELETE da tabela.');
+    },
+    async deletePhoto(path) {
+      const [folder, name] = path.split('/');
+      const storage = client.storage.from(BUCKET);
+      async function exists() {
+        const { data, error } = await storage.list(folder, { search: name, limit: 100 });
+        if (error) throw error;
+        return data.some((file) => file.name === name);
+      }
+      if (!await exists()) return;
+      const { error } = await storage.remove([path]);
+      if (error) throw error;
+      if (await exists()) throw new Error('A foto aguarda permissão para ser excluída na nuvem. Execute supabase/03_excluir_fotos.sql no Supabase.');
     },
   };
 }

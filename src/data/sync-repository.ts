@@ -1,6 +1,7 @@
 import type { ClothingItem, Outfit } from '../types/wardrobe';
 import type { RemoteClothing, RemoteOutfit, RemoteOutfitItem, SyncBinding } from '../services/sync-types';
 import type { LocalDatabase } from './clothing-repository';
+import { wasDeleted } from './wardrobe-mutations';
 
 export async function getSyncValue(db: LocalDatabase, key: string) {
   return (await db.getFirstAsync<{ value: string }>('SELECT value FROM sync_metadata WHERE key = ?', key))?.value ?? null;
@@ -28,6 +29,7 @@ export async function confirmOutfit(db: LocalDatabase, sent: Outfit, received: R
     WHERE id=? AND updated_at=? AND sync_status='pending'`, received.updated_at, sent.id, sent.updatedAt);
 }
 export async function mergeClothing(db: LocalDatabase, row: RemoteClothing) {
+  if (await wasDeleted(db, 'clothing', row.id)) return false;
   const local = await db.getFirstAsync<{ sync_status: string; updated_at: string; remote_photo_path: string | null }>('SELECT sync_status, updated_at, remote_photo_path FROM clothing_items WHERE id=?', row.id);
   if (local && (local.sync_status === 'pending' || Date.parse(local.updated_at) > Date.parse(row.updated_at))) return false;
   await db.runAsync(`INSERT INTO clothing_items
@@ -41,6 +43,8 @@ export async function mergeClothing(db: LocalDatabase, row: RemoteClothing) {
   return !local;
 }
 export async function mergeOutfit(db: LocalDatabase, row: RemoteOutfit, links: RemoteOutfitItem[]) {
+  if (await wasDeleted(db, 'outfit', row.id)) return false;
+  for (const link of links) if (await wasDeleted(db, 'clothing', link.clothing_item_id)) return false;
   const local = await db.getFirstAsync<{ sync_status: string; updated_at: string }>('SELECT sync_status,updated_at FROM outfits WHERE id=?', row.id);
   if (local && (local.sync_status === 'pending' || Date.parse(local.updated_at) > Date.parse(row.updated_at))) return false;
   if (!links.length) return false; // Nao exibe um look remoto cujo envio ainda esta incompleto.

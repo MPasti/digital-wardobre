@@ -19,9 +19,7 @@ export default function WardrobeScreen() {
       ListHeaderComponent={<View style={styles.headerContent}>
         <AppHeader onHelp={() => router.push('/guia')} />
         <View style={styles.intro}>
-          <Text style={styles.eyebrow}>MENOS BAGUNÇA. MAIS POSSIBILIDADES.</Text>
-          <Text style={styles.title} accessibilityRole="header">Seu estilo,{'\n'}ao seu alcance.</Text>
-          <Text style={styles.subtitle}>Um novo olhar para as roupas que já fazem parte de você.</Text>
+          <Text style={styles.title} accessibilityRole="header">Seu armário no {'\n'}seu bolso</Text>
         </View>
         <View style={styles.overview}>
           <View style={styles.metric}><Text style={styles.number}>{items.length}</Text><Text style={styles.metricLabel}>peças no guarda roupa</Text></View>
@@ -43,7 +41,6 @@ export default function WardrobeScreen() {
       ListEmptyComponent={<EmptyState icon="hanger" title={category === 'all' ? 'Espaço para suas\npeças favoritas.' : 'Nenhuma peça\nnessa categoria.'} description={category === 'all' ? 'Cadastre sua primeira peça e comece a redescobrir o que você já tem.' : `Nenhuma peça em “${selectedLabel}”. Experimente outro filtro.`}>
         {category !== 'all' ? <ActionButton label="Ver todas as categorias" secondary onPress={() => setCategory('all')} /> : null}
       </EmptyState>}
-      ListFooterComponent={<View style={styles.footer}><Tip text="Suas peças estão salvas neste aparelho. Uma peça pode ser o começo de muitos looks." /></View>}
     />
   </SafeAreaView>;
 }

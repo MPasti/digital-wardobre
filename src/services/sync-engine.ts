@@ -1,5 +1,6 @@
 import { listClothing } from '../data/clothing-repository';
 import { listOutfits } from '../data/outfit-repository';
+import { confirmDeletion, listDeletions, wasDeleted } from '../data/wardrobe-mutations';
 import { bindDatabase, confirmClothing, confirmOutfit, getBinding, mergeClothing, mergeOutfit, setSyncValue } from '../data/sync-repository';
 import type { SyncDependencies, SyncResult } from './sync-types';
 
@@ -43,6 +44,7 @@ export async function synchronizeOnce(deps: SyncDependencies): Promise<SyncResul
   const pending = (await runLocal(listClothing)).filter((item) => item.syncStatus === 'pending');
   for (const item of pending) {
     try {
+      if (await runLocal((db) => wasDeleted(db, 'clothing', item.id))) continue;
       let photoPath = item.remotePhotoPath;
       if (item.localPhotoPath) {
         photoPath = `${userId}/${item.id}.jpg`;
@@ -60,6 +62,7 @@ export async function synchronizeOnce(deps: SyncDependencies): Promise<SyncResul
   const clothes = await runLocal(listClothing);
   const syncedIds = new Set(clothes.filter((item) => item.syncStatus === 'synced').map((item) => item.id));
   for (const outfit of (await runLocal(listOutfits)).filter((item) => item.syncStatus === 'pending')) {
+    if (await runLocal((db) => wasDeleted(db, 'outfit', outfit.id))) continue;
     if (!outfit.clothingIds.every((id) => syncedIds.has(id))) {
       problem(new Error('Dados do look aguardam o envio das peças que o compõem.'));
       continue;
@@ -71,6 +74,24 @@ export async function synchronizeOnce(deps: SyncDependencies): Promise<SyncResul
       await remote.saveLinks(outfit, userId);
       await runLocal((db) => confirmOutfit(db, outfit, saved));
       result.uploaded++;
+    } catch (error) { problem(error); }
+  }
+
+  // Depois dos envios: cobre inclusive uma exclusão feita durante um upload.
+  for (const deletion of await runLocal(listDeletions)) {
+    try {
+      if (deletion.entity === 'photo') {
+        const item = (await runLocal(listClothing)).find((entry) => entry.id === deletion.id);
+        if (item?.localPhotoPath || item?.remotePhotoPath) {
+          await runLocal((db) => confirmDeletion(db, deletion));
+          continue;
+        }
+        if (item?.syncStatus === 'pending') continue;
+      } else {
+        await remote.deleteRecord(deletion.entity, deletion.id, userId);
+      }
+      if (deletion.entity !== 'outfit') await remote.deletePhoto(`${userId}/${deletion.id}.jpg`);
+      await runLocal((db) => confirmDeletion(db, deletion));
     } catch (error) { problem(error); }
   }
 
@@ -115,7 +136,7 @@ export function createSyncRunner(deps: SyncDependencies) {
       do {
         requestedAgain = false;
         result = await synchronizeOnce(deps);
-      } while (requestedAgain && !result.issues.length);
+      } while (requestedAgain);
       return result;
     })().finally(() => { running = null; });
     return running;

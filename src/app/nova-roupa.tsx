@@ -1,23 +1,32 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as ImagePicker from 'expo-image-picker';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActionButton, Tip } from '../components/ui';
+import { ActionButton, EmptyState, Page, Tip } from '../components/ui';
 import { ClothingPhoto } from '../components/clothing-photo';
 import { useWardrobe } from '../context/wardrobe';
 import { validateDraft, type DraftErrors } from '../services/save-clothing';
 import { theme } from '../theme';
-import { clothingCategories, clothingColors } from '../types/wardrobe';
+import { clothingCategories, clothingColors, type ClothingItem } from '../types/wardrobe';
 
 export default function NewClothingScreen() {
-  const { addClothing } = useWardrobe();
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
-  const [color, setColor] = useState('');
-  const [notes, setNotes] = useState('');
-  const [photoUri, setPhotoUri] = useState<string>();
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  const { items } = useWardrobe();
+  const existing = items.find((item) => item.id === editId);
+  if (editId && !existing) return <Page withHeader><EmptyState icon="hanger" title="Peça não encontrada" description="Essa peça não está mais no seu guarda roupa."><ActionButton label="Voltar ao guarda roupa" onPress={() => router.replace('/')} /></EmptyState></Page>;
+  return <ClothingForm key={editId ?? 'new'} existing={existing} />;
+}
+
+function ClothingForm({ existing }: { existing?: ClothingItem }) {
+  const { addClothing, editClothing } = useWardrobe();
+  const [name, setName] = useState(existing?.name ?? '');
+  const [category, setCategory] = useState(existing?.category ?? '');
+  const [color, setColor] = useState(existing?.color ?? '');
+  const [notes, setNotes] = useState(existing?.notes ?? '');
+  const [photoUri, setPhotoUri] = useState<string | undefined>(existing?.localPhotoUri);
+  const [photoChanged, setPhotoChanged] = useState(false);
   const [errors, setErrors] = useState<DraftErrors>({});
   const [message, setMessage] = useState('');
   const [showSettings, setShowSettings] = useState(false);
@@ -35,6 +44,7 @@ export default function NewClothingScreen() {
       ImagePicker.getPendingResultAsync().then((result) => {
         if (mounted.current && result && 'assets' in result && !result.canceled && result.assets?.[0]) {
           setPhotoUri(result.assets[0].uri);
+          setPhotoChanged(true);
         }
       }).catch(() => undefined);
     }
@@ -73,7 +83,7 @@ export default function NewClothingScreen() {
       const result = source === 'camera'
         ? await ImagePicker.launchCameraAsync(options)
         : await ImagePicker.launchImageLibraryAsync(options);
-      if (mounted.current && !result.canceled && result.assets[0]) setPhotoUri(result.assets[0].uri);
+      if (mounted.current && !result.canceled && result.assets[0]) { setPhotoUri(result.assets[0].uri); setPhotoChanged(true); }
     } catch (error) {
       console.error('Falha ao selecionar foto:', error);
       if (mounted.current) showMessage('Não foi possível abrir essa foto. Tente outra imagem ou continue sem foto.');
@@ -85,7 +95,7 @@ export default function NewClothingScreen() {
 
   async function save() {
     if (lock.current) return;
-    const draft = { name, category, color, notes, photoUri };
+    const draft = { name, category, color, notes, photoUri, photoChanged };
     const validation = validateDraft(draft);
     setErrors(validation);
     setShowSettings(false);
@@ -97,11 +107,12 @@ export default function NewClothingScreen() {
     setSaving(true);
     setMessage('');
     try {
-      const id = await addClothing(draft);
-      router.replace({ pathname: '/roupa/[id]', params: { id, saved: '1' } });
+      const id = existing ? await editClothing(existing.id, draft) : await addClothing(draft);
+      if (existing && router.canGoBack()) router.back();
+      else router.replace({ pathname: '/roupa/[id]', params: { id, saved: '1' } });
     } catch (error) {
       console.error('Falha ao salvar roupa:', error);
-      if (mounted.current) showMessage('Não foi possível salvar a peça. Seus campos foram mantidos. Confira o espaço livre no aparelho e tente novamente.');
+      if (mounted.current) showMessage(error instanceof Error && /^(Essa categoria|Esta peça)/.test(error.message) ? error.message : 'Não foi possível salvar a peça. Seus campos foram mantidos. Confira o espaço livre no aparelho e tente novamente.');
     } finally {
       lock.current = false;
       if (mounted.current) setSaving(false);
@@ -109,13 +120,13 @@ export default function NewClothingScreen() {
   }
 
   return <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>
-    <Stack.Screen options={{ title: 'Nova peça', headerShown: true, gestureEnabled: !busy, headerBackVisible: !busy }} />
+    <Stack.Screen options={{ title: existing ? 'Editar peça' : 'Nova peça', headerShown: true, gestureEnabled: !busy, headerBackVisible: !busy }} />
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={100}>
       <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.intro}>
-          <Text style={styles.eyebrow}>MAIS UMA PEÇA, NOVAS POSSIBILIDADES</Text>
-          <Text style={styles.title} accessibilityRole="header">Vamos guardar?</Text>
-          <Text style={styles.description}>Comece pelo que torna essa peça sua. Os campos marcados com * são obrigatórios.</Text>
+          <Text style={styles.eyebrow}>{existing ? 'DETALHES' : 'NOVA PEÇA'}</Text>
+          <Text style={styles.title} accessibilityRole="header">{existing ? 'Vamos atualizar?' : 'Vamos guardar?'}</Text>
+          <Text style={styles.description}>{existing ? 'Altere os dados ou a foto e salve suas mudanças.' : 'Comece pelo que torna essa peça sua.'} Os campos marcados com * são obrigatórios.</Text>
         </View>
         {message ? <View style={styles.errorBox} accessibilityRole="alert">
           <Text style={styles.errorText}>{message}</Text>
@@ -123,7 +134,7 @@ export default function NewClothingScreen() {
         </View> : null}
         <View style={styles.group}>
           <Text style={styles.label}>Foto <Text style={styles.optional}>(opcional)</Text></Text>
-          {photoUri ? <ClothingPhoto uri={photoUri} name={name || 'nova peça'} style={styles.photo} />
+          {(photoChanged ? photoUri : photoUri ?? existing?.localPhotoUri) ? <ClothingPhoto uri={photoChanged ? photoUri : photoUri ?? existing?.localPhotoUri} name={name || 'nova peça'} style={styles.photo} />
             : <View style={styles.photoEmpty}>
               <MaterialCommunityIcons name="camera-plus-outline" size={36} color={theme.colors.primary} />
               <Text style={styles.photoTitle}>Sua peça em destaque</Text>
@@ -133,7 +144,7 @@ export default function NewClothingScreen() {
             {Platform.OS !== 'web' ? <View style={styles.flex}><ActionButton label="Tirar foto" icon="camera-outline" onPress={() => void pickPhoto('camera')} disabled={busy} secondary /></View> : null}
             <View style={styles.flex}><ActionButton label="Galeria" icon="image-outline" onPress={() => void pickPhoto('library')} disabled={busy} secondary /></View>
           </View>
-          {photoUri ? <Pressable accessibilityRole="button" disabled={busy} onPress={() => setPhotoUri(undefined)} style={styles.remove}>
+          {(photoUri || (!photoChanged && (existing?.localPhotoPath || existing?.remotePhotoPath))) ? <Pressable accessibilityRole="button" disabled={busy} onPress={() => { setPhotoUri(undefined); setPhotoChanged(true); }} style={styles.remove}>
             <Text style={styles.removeText}>Remover foto</Text>
           </Pressable> : null}
           {picking ? <Text style={styles.description}>Abrindo suas fotos…</Text> : null}
@@ -173,8 +184,7 @@ export default function NewClothingScreen() {
           <Text style={styles.counter}>{notes.length}/1.000</Text>
           {errors.notes ? <Text style={styles.errorText}>{errors.notes}</Text> : null}
         </View>
-        <Tip text="Sua peça fica salva neste aparelho e pode ser consultada mesmo sem internet." />
-        <ActionButton label={saving ? 'Salvando sua peça…' : 'Salvar peça'} icon="check" onPress={() => void save()} disabled={busy} loading={saving} />
+        <ActionButton label={saving ? 'Salvando sua peça…' : existing ? 'Salvar alterações' : 'Salvar peça'} icon="check" onPress={() => void save()} disabled={busy} loading={saving} />
       </ScrollView>
     </KeyboardAvoidingView>
   </SafeAreaView>;

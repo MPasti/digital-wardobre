@@ -12,10 +12,10 @@ export async function migrateDatabase(db: LocalDatabase) {
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   const version = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const currentVersion = version?.user_version ?? 0;
-  if (currentVersion > 3) {
+  if (currentVersion > 4) {
     throw new Error('O banco foi criado por uma versão mais recente do aplicativo.');
   }
-  if (currentVersion === 3) return;
+  if (currentVersion === 4) return;
   await db.withTransactionAsync(async () => {
     if (currentVersion === 0) {
     await db.execAsync(`
@@ -56,7 +56,14 @@ export async function migrateDatabase(db: LocalDatabase) {
     `);
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
-      PRAGMA user_version = 3;
+      CREATE TABLE IF NOT EXISTS sync_deletions (
+        entity TEXT NOT NULL CHECK(entity IN ('clothing','outfit','photo')),
+        id TEXT NOT NULL,
+        queued_at TEXT NOT NULL,
+        done INTEGER NOT NULL DEFAULT 0 CHECK(done IN (0,1)),
+        PRIMARY KEY (entity,id)
+      );
+      PRAGMA user_version = 4;
     `);
   });
 }

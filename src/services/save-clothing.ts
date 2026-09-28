@@ -1,4 +1,5 @@
 import { clothingCategories, type ClothingCategory, type ClothingItem } from '../types/wardrobe';
+import { nextUpdatedAt } from '../data/wardrobe-mutations';
 
 export type ClothingDraft = {
   name: string;
@@ -6,6 +7,7 @@ export type ClothingDraft = {
   color: string;
   notes: string;
   photoUri?: string;
+  photoChanged?: boolean;
 };
 export type DraftErrors = Partial<Record<'name' | 'category' | 'color' | 'notes', string>>;
 
@@ -29,21 +31,29 @@ export type SaveDependencies = {
   insert: (item: ClothingItem) => Promise<void>;
 };
 
-export async function saveClothing(draft: ClothingDraft, deps: SaveDependencies): Promise<ClothingItem> {
+export async function saveClothing(draft: ClothingDraft, deps: SaveDependencies, existing?: ClothingItem): Promise<ClothingItem> {
   if (Object.keys(validateDraft(draft)).length) throw new Error('Confira os campos do cadastro.');
-  const id = deps.createId();
-  const now = new Date().toISOString();
-  const photoPath = draft.photoUri ? await deps.persistPhoto(draft.photoUri, id) : undefined;
+  const id = existing?.id ?? deps.createId();
+  const now = existing ? nextUpdatedAt(existing.updatedAt) : new Date().toISOString();
+  const replacePhoto = !existing || !!draft.photoChanged;
+  // Na edição, a nova foto ganha um arquivo separado; uma falha não destrói a antiga.
+  const photoPath = replacePhoto
+    ? draft.photoUri ? await deps.persistPhoto(draft.photoUri, existing ? deps.createId() : id) : undefined
+    : existing?.localPhotoPath;
   const item: ClothingItem = {
     id, name: draft.name.trim(), category: draft.category as ClothingCategory,
     color: draft.color.trim(), notes: draft.notes.trim(), localPhotoPath: photoPath,
-    createdAt: now, updatedAt: now, syncStatus: 'pending',
+    remotePhotoPath: replacePhoto ? undefined : existing?.remotePhotoPath,
+    createdAt: existing?.createdAt ?? now, updatedAt: now, syncStatus: 'pending',
   };
   try {
     await deps.insert(item);
   } catch (error) {
-    if (photoPath) await deps.removePhoto(photoPath).catch(() => undefined);
+    if (replacePhoto && photoPath) await deps.removePhoto(photoPath).catch(() => undefined);
     throw error;
+  }
+  if (replacePhoto && existing?.localPhotoPath && existing.localPhotoPath !== photoPath) {
+    await deps.removePhoto(existing.localPhotoPath).catch(() => undefined);
   }
   return item;
 }

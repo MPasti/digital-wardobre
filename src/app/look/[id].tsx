@@ -1,6 +1,7 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { OutfitComposition } from '../../components/outfit-composition';
+import { RecordActions } from '../../components/record-actions';
 import { ActionButton, EmptyState, Page } from '../../components/ui';
 import { useWardrobe } from '../../context/wardrobe';
 import { orderOutfitItems, outfitSlots } from '../../services/outfits';
@@ -9,7 +10,7 @@ import type { ClothingItem } from '../../types/wardrobe';
 
 export default function OutfitDetailsScreen() {
   const { id, saved } = useLocalSearchParams<{ id: string; saved?: string }>();
-  const { outfits, items } = useWardrobe();
+  const { outfits, items, removeOutfit } = useWardrobe();
   const outfit = outfits.find((entry) => entry.id === id);
   if (!outfit) return <Page withHeader><Stack.Screen options={{ title: 'Look não encontrado' }} /><EmptyState icon="view-grid-outline" title="Não encontramos esse look." description="Ele não está neste guarda roupa local."><ActionButton label="Ver meus looks" onPress={() => router.navigate('/looks')} /></EmptyState></Page>;
   const pieces = orderOutfitItems(outfit.clothingIds.map((clothingId) => items.find((item) => item.id === clothingId)).filter((item): item is ClothingItem => !!item));
@@ -22,6 +23,7 @@ export default function OutfitDetailsScreen() {
       {pieces.map((item) => <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Abrir peça: ${item.name}`} onPress={() => router.push({ pathname: '/roupa/[id]', params: { id: item.id } })} style={styles.pieceRow}><View style={styles.pieceCopy}><Text style={styles.pieceName}>{item.name}</Text><Text style={styles.pieceCategory}>{outfitSlots[item.category].label} · {item.color}</Text></View><Text style={styles.arrow}>›</Text></Pressable>)}
     </View>
     <Text style={styles.savedDate}>Criado em {new Date(outfit.createdAt).toLocaleDateString('pt-BR')}. Disponível neste aparelho.</Text>
+    <RecordActions kind="look" onEdit={() => router.push({ pathname: '/novo-look', params: { editId: outfit.id } })} onDelete={async () => { await removeOutfit(outfit.id); router.replace('/looks'); }} hint="A exclusão é direta. As roupas continuam no seu guarda roupa." />
     <ActionButton label="Ver meus looks" icon="view-grid-outline" onPress={() => router.navigate('/looks')} />
     <ActionButton label="Montar outro look" icon="plus" secondary onPress={() => router.replace('/novo-look')} />
   </Page>;

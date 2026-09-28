@@ -7,7 +7,7 @@ Aplicativo para trabalho de mobile 2 em React Native + Expo para organizar roupa
 Implementado:
 
 - Expo SDK 57, React Native e TypeScript.
-- Navegação por abas com Expo Router: Guarda roupa, Looks e Nuvem.
+- Navegação por abas com Expo Router: Guarda roupa, Looks, Nuvem e Conta.
 - Tela de dicas, retorno e tratamento de rota inexistente.
 - Interface em português, categorias selecionáveis e estados vazios.
 - Tema compartilhado e componentes reutilizáveis.
@@ -19,14 +19,22 @@ Implementado:
 - Looks e suas peças salvos juntos no SQLite, sem duplicar as fotos.
 
 - Identificação automática por Supabase Auth anônimo, com sessão persistente.
+- Cadastro e login com e-mail/senha, saída e arquivos SQLite separados por conta.
+- Conversão do visitante em conta permanente preservando roupas, looks e fotos.
 - Sincronização de roupas, looks e fotos com UUIDs preservados e retentativa sem duplicar.
 - Envio das pendências locais e recebimento dos registros da nuvem no SQLite.
 - Fotos em bucket privado, com cópia local para uso sem internet.
 - Aba Nuvem com contagens pendentes, última sincronização e botão para tentar novamente.
+- Edição de roupas e looks nas mesmas telas de cadastro, com campos preenchidos.
+- Exclusão direta, com envio posterior quando estiver sem internet.
 
 Consulte [Configurar o Supabase](docs/CONFIGURAR-SUPABASE.md): além do `.env`, habilite o acesso anônimo e execute `supabase/02_storage_fotos.sql` no painel. As três tabelas com RLS devem existir conforme o SQL anterior. Com configuração incompleta, o cadastro local continua disponível e a aba Nuvem explica a pendência.
 
-O `id` gerado por `expo-crypto` é o UUID compartilhado entre SQLite e PostgreSQL, cumprindo o papel de `sync_id` da aula. O SDK 57 foi mantido com autorização do usuário. Sem conta vinculada, a identidade anônima depende da sessão deste aparelho; não é recuperável em outro celular. Não há edição/exclusão, conta por e-mail nem visão computacional nesta etapa.
+O `id` gerado por `expo-crypto` é o UUID compartilhado entre SQLite e PostgreSQL, cumprindo o papel de `sync_id` da aula. O SDK 57 foi mantido com autorização do usuário. Sem conta vinculada, a identidade anônima depende da sessão deste aparelho; não é recuperável em outro celular. A aba Conta permite vincular e-mail e senha mantendo o UUID do usuário anônimo. A visão computacional fica para o segundo bimestre.
+
+Para permitir apagar fotos antigas na nuvem, execute `supabase/03_excluir_fotos.sql` uma vez. Consulte [Edição e exclusão](docs/EDICAO-E-EXCLUSAO.md) para o comportamento das roupas usadas em looks.
+
+Consulte [Login e configuração de e-mail](docs/LOGIN.md) para habilitar a vinculação de contas e personalizar a confirmação no Supabase.
 
 ## Abrir no iPhone com Expo Go
 

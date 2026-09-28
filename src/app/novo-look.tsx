@@ -1,22 +1,30 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { OutfitComposition } from '../components/outfit-composition';
 import { OutfitPiecePicker } from '../components/outfit-piece-picker';
-import { ActionButton, EmptyState, Tip } from '../components/ui';
+import { ActionButton, EmptyState, Page, Tip } from '../components/ui';
 import { useWardrobe } from '../context/wardrobe';
 import { toggleOutfitItem, validateOutfit, type OutfitErrors } from '../services/outfits';
 import { theme } from '../theme';
-import type { ClothingCategory, ClothingItem } from '../types/wardrobe';
+import type { ClothingCategory, ClothingItem, Outfit } from '../types/wardrobe';
 
 export default function NewOutfitScreen() {
-  const { items, addOutfit } = useWardrobe();
-  const [name, setName] = useState('');
-  const [occasion, setOccasion] = useState('');
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [onePieceMode, setOnePieceMode] = useState(false);
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  const { outfits } = useWardrobe();
+  const existing = outfits.find((outfit) => outfit.id === editId);
+  if (editId && !existing) return <Page withHeader><EmptyState icon="view-grid-outline" title="Look não encontrado" description="Esse look não está mais disponível."><ActionButton label="Ver meus looks" onPress={() => router.replace('/looks')} /></EmptyState></Page>;
+  return <OutfitForm key={editId ?? 'new'} existing={existing} />;
+}
+
+function OutfitForm({ existing }: { existing?: Outfit }) {
+  const { items, addOutfit, editOutfit } = useWardrobe();
+  const [name, setName] = useState(existing?.name ?? '');
+  const [occasion, setOccasion] = useState(existing?.occasion ?? '');
+  const [selectedIds, setSelectedIds] = useState<string[]>(existing?.clothingIds ?? []);
+  const [onePieceMode, setOnePieceMode] = useState(() => items.some((item) => item.category === 'one-piece' && existing?.clothingIds.includes(item.id)));
   const [picker, setPicker] = useState<ClothingCategory>();
   const [errors, setErrors] = useState<OutfitErrors>({});
   const [message, setMessage] = useState('');
@@ -67,8 +75,9 @@ export default function NewOutfitScreen() {
     setSaving(true);
     setMessage('');
     try {
-      const id = await addOutfit(draft);
-      router.replace({ pathname: '/look/[id]', params: { id, saved: '1' } });
+      const id = existing ? await editOutfit(existing.id, draft) : await addOutfit(draft);
+      if (existing && router.canGoBack()) router.back();
+      else router.replace({ pathname: '/look/[id]', params: { id, saved: '1' } });
     } catch (error) {
       console.error('Falha ao salvar o look local:', error);
       if (mounted.current) {
@@ -82,13 +91,12 @@ export default function NewOutfitScreen() {
   }
 
   return <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>
-    <Stack.Screen options={{ title: 'Montar look', gestureEnabled: !saving, headerBackVisible: false, headerLeft: () => <Pressable accessibilityRole="button" accessibilityLabel="Voltar aos looks" disabled={saving} style={styles.back} onPress={() => router.canGoBack() ? router.back() : router.navigate('/looks')}><MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.primary} /></Pressable> }} />
+    <Stack.Screen options={{ title: existing ? 'Editar look' : 'Montar look', gestureEnabled: !saving, headerBackVisible: false, headerLeft: () => <Pressable accessibilityRole="button" accessibilityLabel="Voltar aos looks" disabled={saving} style={styles.back} onPress={() => router.canGoBack() ? router.back() : router.navigate('/looks')}><MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.primary} /></Pressable> }} />
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={100}>
       <ScrollView ref={scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.intro}>
-          <Text style={styles.eyebrow}>SUAS PEÇAS, NOVAS COMBINAÇÕES</Text>
-          <Text style={styles.title} accessibilityRole="header">Um look com a sua cara.</Text>
-          <Text style={styles.description}>Toque nos espaços para escolher as peças. Veja tudo junto antes de salvar.</Text>
+          <Text style={styles.title} accessibilityRole="header">{existing ? 'Atualize seu look.' : 'Criar um novo look.'}</Text>
+          <Text style={styles.description}>{existing ? 'Troque as peças, o nome ou a ocasião e salve suas mudanças.' : 'Toque nos espaços para escolher as peças. Veja tudo junto antes de salvar.'}</Text>
         </View>
         {!items.length ? <EmptyState icon="hanger" title="Vamos começar pelas roupas?" description="Cadastre suas peças para montar combinações com elas."><ActionButton label="Cadastrar minha primeira peça" icon="plus" onPress={() => router.push('/nova-roupa')} /></EmptyState> : <>
           {message ? <Text accessibilityRole="alert" style={styles.errorBox}>{message}</Text> : null}
@@ -111,8 +119,7 @@ export default function NewOutfitScreen() {
             <TextInput accessibilityLabel="Ocasião do look" placeholder="Ex.: Trabalho, passeio, jantar…" placeholderTextColor={theme.colors.muted} value={occasion} onChangeText={(value) => { setOccasion(value); clearError('occasion'); }} editable={!saving} maxLength={200} style={styles.input} />
             {errors.occasion ? <Text style={styles.error}>{errors.occasion}</Text> : null}
           </View>
-          <Tip text="As mesmas peças podem fazer parte de vários looks. Suas combinações ficam salvas neste aparelho." />
-          <ActionButton label={saving ? 'Salvando seu look…' : 'Salvar look'} icon="check" onPress={() => void save()} disabled={saving} loading={saving} />
+          <ActionButton label={saving ? 'Salvando seu look…' : existing ? 'Salvar alterações' : 'Salvar look'} icon="check" onPress={() => void save()} disabled={saving} loading={saving} />
         </>}
       </ScrollView>
     </KeyboardAvoidingView>

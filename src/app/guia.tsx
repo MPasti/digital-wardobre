@@ -26,7 +26,6 @@ export default function GuideScreen() {
         </Pressable>
       </View>
       <Text style={styles.title} accessibilityRole="header">Pequenos passos,{ '\n' }novas possibilidades.</Text>
-      <Text style={styles.subtitle}>Comece com calma. O melhor guarda roupa é aquele que faz sentido para a sua rotina.</Text>
       <View style={styles.cards}>
         {tips.map((tip) => (
           <View key={tip.number} style={styles.card}>

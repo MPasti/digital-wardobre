@@ -44,6 +44,16 @@ export function requireSupabase() {
   return supabase;
 }
 
+// Valida um login antes de substituir a sessão que já está no aparelho.
+export function createLoginClient() {
+  requireSupabase();
+  if (supabaseConfiguration.status !== 'ready') throw new Error('Configure a conexão com o Supabase.');
+  return createClient(supabaseConfiguration.url, supabaseConfiguration.publishableKey, {
+    global: { fetch: fetchWithTimeout },
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'wardrobe-login-check' },
+  });
+}
+
 // Chamado uma vez no layout; a limpeza evita listeners duplicados no remount.
 export function observeSupabaseAppState() {
   const client = supabase;

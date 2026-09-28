@@ -1,9 +1,11 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Tabs } from 'expo-router';
+import { useWardrobe } from '../../context/wardrobe';
 
 import { theme } from '../../theme';
 
 export default function TabsLayout() {
+  const { account } = useWardrobe();
   return (
     <Tabs screenOptions={{
       headerShown: false,
@@ -13,6 +15,7 @@ export default function TabsLayout() {
       tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
       tabBarItemStyle: { paddingVertical: 4 },
     }}>
+      <Tabs.Protected guard={!account.signedOut}>
       <Tabs.Screen name="index" options={{
         title: 'Guarda roupa',
         tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="hanger" color={color} size={size} />,
@@ -24,6 +27,11 @@ export default function TabsLayout() {
       <Tabs.Screen name="sincronizar" options={{
         title: 'Nuvem',
         tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="cloud-sync-outline" color={color} size={size} />,
+      }} />
+      </Tabs.Protected>
+      <Tabs.Screen name="conta" options={{
+        title: 'Conta',
+        tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-circle-outline" color={color} size={size} />,
       }} />
     </Tabs>
   );

@@ -2,13 +2,14 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { ActionButton, EmptyState, Page } from '../../components/ui';
 import { ClothingPhoto } from '../../components/clothing-photo';
+import { RecordActions } from '../../components/record-actions';
 import { useWardrobe } from '../../context/wardrobe';
 import { theme } from '../../theme';
 import { clothingCategories } from '../../types/wardrobe';
 
 export default function ClothingDetailsScreen() {
   const { id, saved } = useLocalSearchParams<{ id: string; saved?: string }>();
-  const { items } = useWardrobe();
+  const { items, removeClothing } = useWardrobe();
   const item = items.find((entry) => entry.id === id);
   if (!item) return <Page>
     <Stack.Screen options={{ title: 'Peça não encontrada', headerShown: true }} />
@@ -29,6 +30,7 @@ export default function ClothingDetailsScreen() {
     </View>
     {item.notes ? <View style={styles.notes}><Text style={styles.label}>Observações</Text><Text style={styles.body}>{item.notes}</Text></View> : null}
     <Text style={styles.muted}>Adicionada em {new Date(item.createdAt).toLocaleDateString('pt-BR')}. Disponível neste aparelho.</Text>
+    <RecordActions kind="peça" onEdit={() => router.push({ pathname: '/nova-roupa', params: { editId: item.id } })} onDelete={async () => { await removeClothing(item.id); router.replace('/'); }} hint="A exclusão é direta. A peça também sai dos looks; looks que ficarem vazios serão excluídos." />
     <ActionButton label="Ver meu guarda roupa" icon="hanger" onPress={() => router.navigate('/')} />
     <ActionButton label="Cadastrar outra peça" icon="plus" secondary onPress={() => router.replace('/nova-roupa')} />
   </Page>;

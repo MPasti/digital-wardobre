@@ -14,7 +14,7 @@ export default function LooksScreen() {
     <FlatList data={outfits} keyExtractor={(item) => item.id} contentContainerStyle={styles.page}
       ListHeaderComponent={<View style={styles.header}>
         <AppHeader onHelp={() => router.push('/guia')} />
-        <View style={styles.intro}><Text style={styles.eyebrow}>COMBINAÇÕES COM A SUA CARA</Text><Text style={styles.title} accessibilityRole="header">Novas formas{'\n'}de se vestir.</Text><Text style={styles.subtitle}>Suas peças favoritas, juntas. Guarde as combinações que você quer repetir.</Text></View>
+        <View style={styles.intro}><Text style={styles.title} accessibilityRole="header">Novas formas{'\n'}de se vestir.</Text><Text style={styles.subtitle}>Crie looks para organizar como usar suas roupas.</Text></View>
         <ActionButton label="Montar look" icon="plus" onPress={() => router.push('/novo-look')} />
         <View style={styles.sectionHeader}><Text style={styles.sectionTitle} accessibilityRole="header">Seus looks</Text><Text style={styles.count}>{outfits.length} {outfits.length === 1 ? 'combinação' : 'combinações'}</Text></View>
       </View>}
@@ -25,7 +25,7 @@ export default function LooksScreen() {
       ListEmptyComponent={<EmptyState icon="view-grid-outline" title={'Seu próximo look\ncomeça aqui.'} description={items.length ? 'Escolha suas peças e veja a combinação organizada, de cima a baixo.' : 'Cadastre suas primeiras roupas para começar a combinar.'}>
         {!items.length ? <ActionButton label="Cadastrar peça" icon="hanger" secondary onPress={() => router.push('/nova-roupa')} /> : null}
       </EmptyState>}
-      ListFooterComponent={<View style={styles.footer}><Tip text="Uma mesma roupa pode ganhar várias combinações. Experimente mudar os sapatos ou acrescentar um acessório." /></View>} />
+      ListFooterComponent={<View style={styles.footer}></View>} />
   </SafeAreaView>;
 }
 
